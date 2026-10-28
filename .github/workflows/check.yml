@@ -1,0 +1,23 @@
+name: iphone duo stock check
+on:
+  schedule:
+    - cron: "*/5 5-21 * * *"   # elke 5 min, 06:00-23:00 nl-tijd
+  workflow_dispatch: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: check apple amsterdam pickup
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          set -euo pipefail
+          URL="https://www.apple.com/nl/shop/fulfillment-messages?pl=true&mts.0=regular&location=1017CB&parts.0=MK2D4ZD%2FA&parts.1=MK2E4ZD%2FA&parts.2=MK2F4ZD%2FA&parts.3=MK2G4ZD%2FA"
+          JSON=$(curl -sS --fail --max-time 20 -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130 Safari/537.36" -H "Accept: application/json" "$URL")
+          HITS=$(echo "$JSON" | jq -r '.body.content.pickupMessage.stores[] | select(.storeName=="Amsterdam") | .partsAvailability | to_entries[] | select(.value.pickupDisplay=="available") | "\(.key): \(.value.pickupSearchQuote)"' \
+            | sed -e 's#MK2D4ZD/A#256GB kleur 1#' -e 's#MK2E4ZD/A#256GB kleur 2#' -e 's#MK2F4ZD/A#512GB kleur 1#' -e 's#MK2G4ZD/A#512GB kleur 2#')
+          if [ -z "$HITS" ]; then echo "niet op voorraad"; exit 0; fi
+          echo "$HITS"
+          curl -sS -H "Title: iPhone Duo op voorraad in Amsterdam" -H "Priority: urgent" -H "Tags: iphone" \
+            -H "Click: https://www.apple.com/nl/shop/buy-iphone/iphone-duo" -d "$HITS" "https://ntfy.sh/$NTFY_TOPIC"
