@@ -14,7 +14,10 @@ jobs:
         run: |
           set -euo pipefail
           URL="https://www.apple.com/nl/shop/fulfillment-messages?pl=true&mts.0=regular&location=1017CB&parts.0=MK2D4ZD%2FA&parts.1=MK2E4ZD%2FA&parts.2=MK2F4ZD%2FA&parts.3=MK2G4ZD%2FA"
-          JSON=$(curl -sS --fail --max-time 20 -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130 Safari/537.36" -H "Accept: application/json" "$URL")
+          UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+          PAGE="https://www.apple.com/nl/shop/buy-iphone/iphone-duo"
+          curl -sS -c jar.txt -A "$UA" -H "Accept-Language: nl-NL,nl;q=0.9" -o /dev/null -w "page %{http_code}\n" "$PAGE"
+          JSON=$(curl -sS --fail --max-time 20 -b jar.txt -A "$UA" -H "Accept: application/json, text/plain, */*" -H "Accept-Language: nl-NL,nl;q=0.9" -H "Referer: $PAGE" -H "X-Requested-With: XMLHttpRequest" "$URL")
           HITS=$(echo "$JSON" | jq -r '.body.content.pickupMessage.stores[] | select(.storeName=="Amsterdam") | .partsAvailability | to_entries[] | select(.value.pickupDisplay=="available") | "\(.key): \(.value.pickupSearchQuote)"' \
             | sed -e 's#MK2D4ZD/A#256GB kleur 1#' -e 's#MK2E4ZD/A#256GB kleur 2#' -e 's#MK2F4ZD/A#512GB kleur 1#' -e 's#MK2G4ZD/A#512GB kleur 2#')
           if [ -z "$HITS" ]; then echo "niet op voorraad"; exit 0; fi
